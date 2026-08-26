@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -16,6 +17,7 @@ def create_engine() -> AsyncEngine:
     return create_async_engine(
         settings.database_url,
         echo=settings.debug,
+        pool_pre_ping=True,
     )
 
 
