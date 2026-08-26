@@ -13,6 +13,8 @@ services:
         condition: service_healthy
     volumes:
       - ./app:/app/app
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
     command:
       [
         "uvicorn",
