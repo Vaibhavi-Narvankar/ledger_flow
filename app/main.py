@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.exceptions import UserAlreadyExistsError
+from app.core.exception_handlers import user_already_exists_handler
 
 
 settings = get_settings()
@@ -9,6 +11,10 @@ app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
     debug=settings.debug,
+)
+app.add_exception_handler(
+    UserAlreadyExistsError,
+    user_already_exists_handler,
 )
 
 app.include_router(
