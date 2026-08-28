@@ -4,6 +4,8 @@ from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 from typing import TYPE_CHECKING
+from sqlalchemy import CheckConstraint
+from sqlalchemy import UniqueConstraint
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -25,10 +27,29 @@ class Wallet(Base):
         nullable=False,
     )
 
+    __table_args__ = (
+        CheckConstraint(
+            "char_length(currency) = 3",
+            name="currency_length",
+        ),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "currency",
+            name="uq_wallets_user_id_currency",
+        ),
+        CheckConstraint(
+            "char_length(currency) = 3",
+            name="currency_length",
+        ),
+    )
+
     balance: Mapped[Decimal] = mapped_column(
         Numeric(20, 8),
         nullable=False,
-        default=Decimal("0"),
+        server_default="0",
     )
 
     created_at: Mapped[datetime] = mapped_column(
