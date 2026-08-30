@@ -2,18 +2,18 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.wallet import (WalletCreate,WalletResponse)
 from app.core.database import get_db
-from app.service.wallet import WalletService
+from app.services.wallet import WalletService
 
 router = APIRouter(prefix="/wallets", tags=["Wallets"])
 
-router.post(
+@router.post(
     "",
     response_model=WalletResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_wallet(
-   data:WalletCreate
+   data:WalletCreate,
    db: AsyncSession = Depends(get_db),
 ) -> WalletResponse:
      service = WalletService(db)
-     return service.WalletService(data)
+     return await service.create_wallet(data)

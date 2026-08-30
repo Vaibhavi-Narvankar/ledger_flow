@@ -47,8 +47,9 @@ class Wallet(Base):
     )
 
     balance: Mapped[Decimal] = mapped_column(
-        Numeric(20, 8),
+        Numeric(precision=20, scale=8),
         nullable=False,
+        default=Decimal("0"),
         server_default="0",
     )
 
