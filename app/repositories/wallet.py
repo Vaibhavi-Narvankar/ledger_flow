@@ -15,6 +15,18 @@ class WalletRepository:
 
         return result.scalar_one_or_none()
 
+    async def get_by_user_id(self, user_id: int) -> list[Wallet]:
+        result = await self.db.execute(
+            select(Wallet)
+            .where(Wallet.user_id == user_id)
+            .order_by(Wallet.id)
+        )
+        return list(result.scalars().all())
+
+    async def delete(self, wallet: Wallet) -> None:
+        await self.db.delete(wallet)
+        await self.db.flush()
+
     async def get_by_user_and_currency(
         self,
         user_id: int,

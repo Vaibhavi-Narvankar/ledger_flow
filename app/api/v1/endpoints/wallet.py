@@ -17,3 +17,38 @@ async def create_wallet(
 ) -> WalletResponse:
      service = WalletService(db)
      return await service.create_wallet(data)
+
+
+
+@router.get(
+    "/user/{user_id}",
+    response_model=list[WalletResponse],
+)
+async def get_user_wallets(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> list[WalletResponse]:
+    service = WalletService(db)
+    return await service.get_user_wallets(user_id)
+
+@router.get(
+    "/{wallet_id}",
+    response_model=WalletResponse,
+)
+async def get_wallet(
+    wallet_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> WalletResponse:
+    service = WalletService(db)
+    return await service.get_wallet(wallet_id)
+
+@router.delete(
+    "/{wallet_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_wallet(
+    wallet_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    service = WalletService(db)
+    await service.delete_wallet(wallet_id)

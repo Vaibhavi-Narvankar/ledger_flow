@@ -1,6 +1,5 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.config import SUPPORTED_CURRENCIES
 from app.core.exceptions import (
     UnsupportedCurrencyError,
@@ -11,6 +10,7 @@ from app.models.wallet import Wallet
 from app.repositories.user import UserRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.wallet import WalletCreate, WalletResponse
+from app.core.exceptions import WalletNotFoundError
 
 
 class WalletService:
@@ -69,3 +69,35 @@ class WalletService:
             raise
 
         return WalletResponse.model_validate(wallet)
+
+    async def get_wallet(self, wallet_id: int) -> Wallet:
+
+        wallet = await self.wallet_repository.get_by_id(wallet_id)
+
+        if wallet is None:
+
+            raise WalletNotFoundError(
+
+                f"Wallet {wallet_id} not found"
+
+            )
+
+        return wallet
+
+    async def get_user_wallets(self, user_id: int) -> list[Wallet]:
+
+        return await self.wallet_repository.get_by_user_id(user_id)
+
+    async def delete_wallet(self, wallet_id: int) -> None:
+
+        wallet = await self.wallet_repository.get_by_id(wallet_id)
+
+        if wallet is None:
+
+            raise WalletNotFoundError(
+
+                f"Wallet {wallet_id} not found"
+
+            )
+
+        await self.wallet_repository.delete(wallet)

@@ -19,3 +19,6 @@ class WalletNotFoundError(AppException):
 
 class UnsupportedCurrencyError(AppException):
     """Raised when the requested currency is not supported."""
+
+class WalletNotFoundError(Exception):
+    pass
