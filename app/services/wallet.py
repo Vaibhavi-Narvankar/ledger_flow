@@ -60,44 +60,28 @@ class WalletService:
 
         except IntegrityError as exc:
             await self.db.rollback()
-
             if getattr(exc.orig, "sqlstate", None) == "23505":
                 raise WalletAlreadyExistsError(
                     "Wallet already exists for this currency"
                 ) from None
-
             raise
-
         return WalletResponse.model_validate(wallet)
 
     async def get_wallet(self, wallet_id: int) -> Wallet:
-
         wallet = await self.wallet_repository.get_by_id(wallet_id)
-
         if wallet is None:
-
             raise WalletNotFoundError(
-
                 f"Wallet {wallet_id} not found"
-
             )
-
         return wallet
 
     async def get_user_wallets(self, user_id: int) -> list[Wallet]:
-
         return await self.wallet_repository.get_by_user_id(user_id)
 
     async def delete_wallet(self, wallet_id: int) -> None:
-
         wallet = await self.wallet_repository.get_by_id(wallet_id)
-
         if wallet is None:
-
             raise WalletNotFoundError(
-
                 f"Wallet {wallet_id} not found"
-
             )
-
         await self.wallet_repository.delete(wallet)
