@@ -13,6 +13,9 @@ if TYPE_CHECKING:
 if TYPE_CHECKING:
     from app.models.transaction import Transaction
 
+if TYPE_CHECKING:
+    from app.models.ledger import LedgerEntry
+
 
 class Wallet(Base):
     __tablename__ = "wallets"
@@ -75,4 +78,8 @@ class Wallet(Base):
 
     user: Mapped["User"] = relationship(
         back_populates="wallets",
+    )
+
+    ledger_entries: Mapped[list["LedgerEntry"]] = relationship(
+        back_populates="wallet",
     )

@@ -10,6 +10,9 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.wallet import Wallet
 
+if TYPE_CHECKING:
+    from app.models.ledger import LedgerEntry
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -62,4 +65,8 @@ class Transaction(Base):
     receiver_wallet: Mapped["Wallet | None"] = relationship(
         foreign_keys=[receiver_wallet_id],
         back_populates="received_transactions",
+    )
+
+    ledger_entries: Mapped[list["LedgerEntry"]] = relationship(
+        back_populates="transaction",
     )
