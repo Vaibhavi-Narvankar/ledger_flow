@@ -10,6 +10,9 @@ from sqlalchemy import UniqueConstraint
 if TYPE_CHECKING:
     from app.models.user import User
 
+if TYPE_CHECKING:
+    from app.models.transaction import Transaction
+
 
 class Wallet(Base):
     __tablename__ = "wallets"
@@ -27,12 +30,6 @@ class Wallet(Base):
         nullable=False,
     )
 
-    __table_args__ = (
-        CheckConstraint(
-            "char_length(currency) = 3",
-            name="currency_length",
-        ),
-    )
 
     __table_args__ = (
         UniqueConstraint(
@@ -44,6 +41,16 @@ class Wallet(Base):
             "char_length(currency) = 3",
             name="currency_length",
         ),
+    )
+
+    sent_transactions: Mapped[list["Transaction"]] = relationship(
+        foreign_keys="Transaction.sender_wallet_id",
+        back_populates="sender_wallet",
+    )
+
+    received_transactions: Mapped[list["Transaction"]] = relationship(
+        foreign_keys="Transaction.receiver_wallet_id",
+        back_populates="receiver_wallet",
     )
 
     balance: Mapped[Decimal] = mapped_column(
