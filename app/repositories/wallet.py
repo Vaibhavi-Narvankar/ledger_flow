@@ -43,8 +43,6 @@ class WalletRepository:
 
     async def create(self, wallet: Wallet) -> Wallet:
         self.db.add(wallet)
-
         await self.db.flush()
         await self.db.refresh(wallet)
-
         return wallet

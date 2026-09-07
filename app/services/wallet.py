@@ -80,8 +80,16 @@ class WalletService:
 
     async def delete_wallet(self, wallet_id: int) -> None:
         wallet = await self.wallet_repository.get_by_id(wallet_id)
+
         if wallet is None:
             raise WalletNotFoundError(
                 f"Wallet {wallet_id} not found"
             )
-        await self.wallet_repository.delete(wallet)
+
+        try:
+            await self.wallet_repository.delete(wallet)
+            await self.db.commit()
+
+        except IntegrityError:
+            await self.db.rollback()
+            raise
