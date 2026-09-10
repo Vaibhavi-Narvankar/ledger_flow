@@ -1,6 +1,6 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from app.core.exceptions import UserAlreadyExistsError
+from app.core.exceptions import UserAlreadyExistsError,InsufficientBalanceError,SameWalletTransferError,
 
 
 async def user_already_exists_handler(
@@ -49,4 +49,22 @@ async def unsupported_currency_handler(
         status_code=400,
         content={"detail": str(exc)},
 
+    )
+
+async def insufficient_balance_handler(
+    request: Request,
+    exc: InsufficientBalanceError,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)},
+    )
+
+async def same_wallet_transfer_handler(
+    request: Request,
+    exc: SameWalletTransferError,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)},
     )

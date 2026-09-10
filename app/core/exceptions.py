@@ -22,3 +22,10 @@ class UnsupportedCurrencyError(AppException):
 
 class WalletNotFoundError(Exception):
     pass
+
+class InsufficientBalanceError(Exception):
+    pass
+
+
+class SameWalletTransferError(Exception):
+    pass
