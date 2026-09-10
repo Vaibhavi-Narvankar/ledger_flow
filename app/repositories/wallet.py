@@ -1,7 +1,20 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.models.wallet import Wallet
+from sqlalchemy import select
+
+
+async def get_by_id_for_update(
+    self,
+    wallet_id: int,
+) -> Wallet | None:
+    result = await self.db.execute(
+        select(Wallet)
+        .where(Wallet.id == wallet_id)
+        .with_for_update()
+    )
+
+    return result.scalar_one_or_none()
 
 
 class WalletRepository:
