@@ -29,3 +29,6 @@ class InsufficientBalanceError(Exception):
 
 class SameWalletTransferError(Exception):
     pass
+
+class CurrencyMismatchError(Exception):
+    pass

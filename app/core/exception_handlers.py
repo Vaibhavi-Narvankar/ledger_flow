@@ -68,3 +68,12 @@ async def same_wallet_transfer_handler(
         status_code=400,
         content={"detail": str(exc)},
     )
+
+async def currency_mismatch_handler(
+    request: Request,
+    exc: CurrencyMismatchError,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)},
+    )

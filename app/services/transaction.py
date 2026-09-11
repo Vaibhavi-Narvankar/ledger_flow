@@ -7,6 +7,7 @@ from app.core.exceptions import (
     InsufficientBalanceError,
     SameWalletTransferError,
     WalletNotFoundError,
+    CurrencyMismatchError,
 )
 from app.models.ledger import LedgerEntry
 from app.models.transaction import Transaction
@@ -71,7 +72,7 @@ class TransactionService:
 
         # Currency must match.
         if sender_wallet.currency != receiver_wallet.currency:
-            raise ValueError(
+            raise CurrencyMismatchError(
                 "Sender and receiver wallets must use the same currency"
             )
 
