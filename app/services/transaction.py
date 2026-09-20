@@ -1,7 +1,5 @@
 from decimal import Decimal
-
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.enums import TransactionStatus, TransactionType
 from app.core.exceptions import (
     InsufficientBalanceError,
@@ -14,7 +12,7 @@ from app.models.transaction import Transaction
 from app.repositories.ledger import LedgerRepository
 from app.repositories.transaction import TransactionRepository
 from app.repositories.wallet import WalletRepository
-from app.schemas.transaction import TransferCreate, TransactionResponse
+from app.schemas.transaction import TransferCreate, TransactionResponse, DepositCreate
 
 
 class TransactionService:
@@ -23,6 +21,53 @@ class TransactionService:
         self.wallet_repository = WalletRepository(db)
         self.transaction_repository = TransactionRepository(db)
         self.ledger_repository = LedgerRepository(db)
+
+    async def create_deposit(
+            self,
+            data: DepositCreate,
+        ) -> TransactionResponse:
+            # Lock the wallet for the duration of this transaction.
+            wallet = await self.wallet_repository.get_by_id_for_update(
+                data.wallet_id
+            )
+            if wallet is None:
+                raise WalletNotFoundError(
+                    f"Wallet {data.wallet_id} not found"
+                )
+            try:
+                # Create transaction record.
+                transaction = Transaction(
+                    sender_wallet_id=None,
+                    receiver_wallet_id=wallet.id,
+                    amount=data.amount,
+                    currency=wallet.currency,
+                    transaction_type=TransactionType.DEPOSIT.value,
+                    status=TransactionStatus.COMPLETED.value,
+                )
+                transaction = await self.transaction_repository.create(
+                    transaction
+                )
+                # Credit wallet.
+                wallet.balance += data.amount
+                # Create CREDIT ledger entry.
+                ledger_entry = LedgerEntry(
+                    transaction_id=transaction.id,
+                    wallet_id=wallet.id,
+                    entry_type=LedgerEntryType.CREDIT.value,
+                    amount=data.amount,
+                )
+
+                await self.ledger_repository.create(
+                    ledger_entry
+                )
+                # One atomic database transaction.
+                await self.db.commit()
+            except Exception:
+                await self.db.rollback()
+                raise
+            return TransactionResponse.model_validate(
+                transaction
+            )
 
     async def create_transfer(
         self,
