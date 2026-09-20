@@ -20,15 +20,13 @@ class WalletNotFoundError(AppException):
 class UnsupportedCurrencyError(AppException):
     """Raised when the requested currency is not supported."""
 
-class WalletNotFoundError(Exception):
-    pass
-
-class InsufficientBalanceError(Exception):
-    pass
+class InsufficientBalanceError(AppException):
+    """Raised when a wallet does not have sufficient funds."""
 
 
-class SameWalletTransferError(Exception):
-    pass
+class SameWalletTransferError(AppException):
+    """Raised when sender and receiver wallets are the same."""
 
-class CurrencyMismatchError(Exception):
-    pass
+
+class CurrencyMismatchError(AppException):
+    """Raised when sender and receiver currencies do not match."""
