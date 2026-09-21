@@ -1,6 +1,6 @@
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.enums import TransactionStatus, TransactionType
+from app.core.enums import TransactionStatus, TransactionType,LedgerEntryType
 from app.core.exceptions import (
     InsufficientBalanceError,
     SameWalletTransferError,
