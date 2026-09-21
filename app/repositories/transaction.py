@@ -20,6 +20,17 @@ class TransactionRepository:
 
         return result.scalar_one_or_none()
 
+    async def get_by_idempotency_key(
+        self,
+        idempotency_key: str,
+    ) -> Transaction | None:
+        result = await self.db.execute(
+            select(Transaction).where(
+                Transaction.idempotency_key == idempotency_key
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def create(
         self,
         transaction: Transaction,

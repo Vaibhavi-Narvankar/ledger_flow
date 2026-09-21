@@ -30,3 +30,6 @@ class SameWalletTransferError(AppException):
 
 class CurrencyMismatchError(AppException):
     """Raised when sender and receiver currencies do not match."""
+
+class IdempotencyConflictError(AppException):
+    """Raised when an idempotency key is reused for a different request."""

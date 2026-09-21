@@ -7,12 +7,14 @@ from app.core.exceptions import (
     InsufficientBalanceError,
     SameWalletTransferError,
     CurrencyMismatchError,
+    IdempotencyConflictError,
 )
 from app.core.exception_handlers import (
     user_already_exists_handler,
     insufficient_balance_handler,
     same_wallet_transfer_handler,
     currency_mismatch_handler,
+    idempotency_conflict_handler,
 )
 
 
@@ -46,6 +48,10 @@ app.add_exception_handler(
     currency_mismatch_handler,
 )
 
+app.add_exception_handler(
+    IdempotencyConflictError,
+    idempotency_conflict_handler,
+)
 
 app.include_router(
     api_router,

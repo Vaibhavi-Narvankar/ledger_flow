@@ -1,7 +1,14 @@
-from fastapi import APIRouter, Depends, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
-from app.schemas.transaction import TransferCreate, TransactionResponse, DepositCreate
+from app.schemas.transaction import (
+    DepositCreate,
+    TransactionResponse,
+    TransferCreate,
+)
 from app.services.transaction import TransactionService
 
 
@@ -10,6 +17,7 @@ router = APIRouter(
     tags=["Transactions"],
 )
 
+
 @router.post(
     "/deposits",
     response_model=TransactionResponse,
@@ -17,10 +25,22 @@ router = APIRouter(
 )
 async def create_deposit(
     data: DepositCreate,
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=1,
+            max_length=64,
+        ),
+    ],
     db: AsyncSession = Depends(get_db),
 ) -> TransactionResponse:
     service = TransactionService(db)
-    return await service.create_deposit(data)
+
+    return await service.create_deposit(
+        data=data,
+        idempotency_key=idempotency_key,
+    )
 
 
 @router.post(
@@ -30,9 +50,19 @@ async def create_deposit(
 )
 async def create_transfer(
     data: TransferCreate,
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=1,
+            max_length=64,
+        ),
+    ],
     db: AsyncSession = Depends(get_db),
 ) -> TransactionResponse:
-
     service = TransactionService(db)
 
-    return await service.create_transfer(data)
+    return await service.create_transfer(
+        data=data,
+        idempotency_key=idempotency_key,
+    )

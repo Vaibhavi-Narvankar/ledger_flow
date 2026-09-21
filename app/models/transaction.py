@@ -1,8 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -69,4 +75,16 @@ class Transaction(Base):
 
     ledger_entries: Mapped[list["LedgerEntry"]] = relationship(
         back_populates="transaction",
+    )
+
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "idempotency_key",
+            name="uq_transactions_idempotency_key",
+        ),
     )

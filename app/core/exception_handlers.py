@@ -77,3 +77,12 @@ async def currency_mismatch_handler(
         status_code=400,
         content={"detail": str(exc)},
     )
+
+async def idempotency_conflict_handler(
+    request: Request,
+    exc: IdempotencyConflictError,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={"detail": str(exc)},
+    )

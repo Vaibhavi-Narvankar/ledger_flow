@@ -1,18 +1,28 @@
-from decimal import Decimal
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.enums import TransactionStatus, TransactionType,LedgerEntryType
+
+from app.core.enums import (
+    LedgerEntryType,
+    TransactionStatus,
+    TransactionType,
+)
 from app.core.exceptions import (
+    CurrencyMismatchError,
+    IdempotencyConflictError,
     InsufficientBalanceError,
     SameWalletTransferError,
     WalletNotFoundError,
-    CurrencyMismatchError,
 )
 from app.models.ledger import LedgerEntry
 from app.models.transaction import Transaction
 from app.repositories.ledger import LedgerRepository
 from app.repositories.transaction import TransactionRepository
 from app.repositories.wallet import WalletRepository
-from app.schemas.transaction import TransferCreate, TransactionResponse, DepositCreate
+from app.schemas.transaction import (
+    DepositCreate,
+    TransactionResponse,
+    TransferCreate,
+)
 
 
 class TransactionService:
@@ -22,68 +32,169 @@ class TransactionService:
         self.transaction_repository = TransactionRepository(db)
         self.ledger_repository = LedgerRepository(db)
 
-    async def create_deposit(
-            self,
-            data: DepositCreate,
-        ) -> TransactionResponse:
-            # Lock the wallet for the duration of this transaction.
-            wallet = await self.wallet_repository.get_by_id_for_update(
-                data.wallet_id
+    def _validate_deposit_idempotency(
+        self,
+        transaction: Transaction,
+        data: DepositCreate,
+    ) -> None:
+        if (
+            transaction.transaction_type != TransactionType.DEPOSIT.value
+            or transaction.sender_wallet_id is not None
+            or transaction.receiver_wallet_id != data.wallet_id
+            or transaction.amount != data.amount
+        ):
+            raise IdempotencyConflictError(
+                "Idempotency key was already used for a different request"
             )
-            if wallet is None:
-                raise WalletNotFoundError(
-                    f"Wallet {data.wallet_id} not found"
-                )
-            try:
-                # Create transaction record.
-                transaction = Transaction(
-                    sender_wallet_id=None,
-                    receiver_wallet_id=wallet.id,
-                    amount=data.amount,
-                    currency=wallet.currency,
-                    transaction_type=TransactionType.DEPOSIT.value,
-                    status=TransactionStatus.COMPLETED.value,
-                )
-                transaction = await self.transaction_repository.create(
-                    transaction
-                )
-                # Credit wallet.
-                wallet.balance += data.amount
-                # Create CREDIT ledger entry.
-                ledger_entry = LedgerEntry(
-                    transaction_id=transaction.id,
-                    wallet_id=wallet.id,
-                    entry_type=LedgerEntryType.CREDIT.value,
-                    amount=data.amount,
-                )
 
-                await self.ledger_repository.create(
-                    ledger_entry
-                )
-                # One atomic database transaction.
-                await self.db.commit()
-            except Exception:
-                await self.db.rollback()
-                raise
+    def _validate_transfer_idempotency(
+        self,
+        transaction: Transaction,
+        data: TransferCreate,
+    ) -> None:
+        if (
+            transaction.transaction_type != TransactionType.TRANSFER.value
+            or transaction.sender_wallet_id != data.sender_wallet_id
+            or transaction.receiver_wallet_id != data.receiver_wallet_id
+            or transaction.amount != data.amount
+        ):
+            raise IdempotencyConflictError(
+                "Idempotency key was already used for a different request"
+            )
+
+    async def create_deposit(
+        self,
+        data: DepositCreate,
+        idempotency_key: str,
+    ) -> TransactionResponse:
+
+        idempotency_key = idempotency_key.strip()
+
+
+        existing_transaction = (
+            await self.transaction_repository.get_by_idempotency_key(
+                idempotency_key
+            )
+        )
+
+        if existing_transaction is not None:
+            self._validate_deposit_idempotency(
+                existing_transaction,
+                data,
+            )
+
             return TransactionResponse.model_validate(
+                existing_transaction
+            )
+
+
+        wallet = await self.wallet_repository.get_by_id_for_update(
+            data.wallet_id
+        )
+
+        if wallet is None:
+            raise WalletNotFoundError(
+                f"Wallet {data.wallet_id} not found"
+            )
+
+
+        try:
+            transaction = Transaction(
+                sender_wallet_id=None,
+                receiver_wallet_id=wallet.id,
+                amount=data.amount,
+                currency=wallet.currency,
+                transaction_type=TransactionType.DEPOSIT.value,
+                status=TransactionStatus.COMPLETED.value,
+                idempotency_key=idempotency_key,
+            )
+
+            transaction = await self.transaction_repository.create(
                 transaction
             )
+
+            wallet.balance += data.amount
+
+            ledger_entry = LedgerEntry(
+                transaction_id=transaction.id,
+                wallet_id=wallet.id,
+                entry_type=LedgerEntryType.CREDIT.value,
+                amount=data.amount,
+            )
+
+            await self.ledger_repository.create(
+                ledger_entry
+            )
+
+            await self.db.commit()
+
+        except IntegrityError as exc:
+            await self.db.rollback()
+
+            # Concurrent request with the same idempotency key
+            if getattr(exc.orig, "sqlstate", None) == "23505":
+
+                existing_transaction = (
+                    await self.transaction_repository.get_by_idempotency_key(
+                        idempotency_key
+                    )
+                )
+
+                if existing_transaction is not None:
+                    self._validate_deposit_idempotency(
+                        existing_transaction,
+                        data,
+                    )
+
+                    return TransactionResponse.model_validate(
+                        existing_transaction
+                    )
+
+            raise
+
+        except Exception:
+            await self.db.rollback()
+            raise
+
+
+        return TransactionResponse.model_validate(
+            transaction
+        )
 
     async def create_transfer(
         self,
         data: TransferCreate,
+        idempotency_key: str,
     ) -> TransactionResponse:
+
+        idempotency_key = idempotency_key.strip()
+
+        existing_transaction = (
+            await self.transaction_repository.get_by_idempotency_key(
+                idempotency_key
+            )
+        )
+
+        if existing_transaction is not None:
+            self._validate_transfer_idempotency(
+                existing_transaction,
+                data,
+            )
+
+            return TransactionResponse.model_validate(
+                existing_transaction
+            )
 
         if data.sender_wallet_id == data.receiver_wallet_id:
             raise SameWalletTransferError(
                 "Sender and receiver wallets must be different"
             )
 
-        # Always lock wallets in deterministic order.
         first_wallet_id = min(
             data.sender_wallet_id,
             data.receiver_wallet_id,
         )
+
         second_wallet_id = max(
             data.sender_wallet_id,
             data.receiver_wallet_id,
@@ -107,7 +218,7 @@ class TransactionService:
                 f"Wallet {second_wallet_id} not found"
             )
 
-        # Map the locked wallets back to their actual roles.
+
         if data.sender_wallet_id == first_wallet.id:
             sender_wallet = first_wallet
             receiver_wallet = second_wallet
@@ -115,13 +226,12 @@ class TransactionService:
             sender_wallet = second_wallet
             receiver_wallet = first_wallet
 
-        # Currency must match.
         if sender_wallet.currency != receiver_wallet.currency:
             raise CurrencyMismatchError(
                 "Sender and receiver wallets must use the same currency"
             )
 
-        # Balance check happens while sender wallet is locked.
+
         if sender_wallet.balance < data.amount:
             raise InsufficientBalanceError(
                 "Insufficient wallet balance"
@@ -135,39 +245,68 @@ class TransactionService:
                 currency=sender_wallet.currency,
                 transaction_type=TransactionType.TRANSFER.value,
                 status=TransactionStatus.COMPLETED.value,
+                idempotency_key=idempotency_key,
             )
 
             transaction = await self.transaction_repository.create(
                 transaction
             )
 
-            # Update balances.
             sender_wallet.balance -= data.amount
             receiver_wallet.balance += data.amount
 
-            # Ledger debit.
             debit_entry = LedgerEntry(
                 transaction_id=transaction.id,
                 wallet_id=sender_wallet.id,
-                entry_type="DEBIT",
+                entry_type=LedgerEntryType.DEBIT.value,
                 amount=data.amount,
             )
 
-            # Ledger credit.
             credit_entry = LedgerEntry(
                 transaction_id=transaction.id,
                 wallet_id=receiver_wallet.id,
-                entry_type="CREDIT",
+                entry_type=LedgerEntryType.CREDIT.value,
                 amount=data.amount,
             )
 
-            await self.ledger_repository.create(debit_entry)
-            await self.ledger_repository.create(credit_entry)
+            await self.ledger_repository.create(
+                debit_entry
+            )
+
+            await self.ledger_repository.create(
+                credit_entry
+            )
 
             await self.db.commit()
+
+        except IntegrityError as exc:
+            await self.db.rollback()
+
+            # Concurrent request with same idempotency key
+            if getattr(exc.orig, "sqlstate", None) == "23505":
+
+                existing_transaction = (
+                    await self.transaction_repository.get_by_idempotency_key(
+                        idempotency_key
+                    )
+                )
+
+                if existing_transaction is not None:
+                    self._validate_transfer_idempotency(
+                        existing_transaction,
+                        data,
+                    )
+
+                    return TransactionResponse.model_validate(
+                        existing_transaction
+                    )
+
+            raise
 
         except Exception:
             await self.db.rollback()
             raise
 
-        return TransactionResponse.model_validate(transaction)
+        return TransactionResponse.model_validate(
+            transaction
+        )
