@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.transaction import Transaction
@@ -102,7 +102,7 @@ class TransactionRepository:
             query = select(
                 func.count(Transaction.id)
             ).where(
-                or_(
+                or(
                     Transaction.sender_wallet_id == wallet_id,
                     Transaction.receiver_wallet_id == wallet_id,
                 )
