@@ -8,6 +8,7 @@ from app.core.exceptions import (
     SameWalletTransferError,
     CurrencyMismatchError,
     IdempotencyConflictError,
+    TransactionNotFoundError,
 )
 from app.core.exception_handlers import (
     user_already_exists_handler,
@@ -15,6 +16,7 @@ from app.core.exception_handlers import (
     same_wallet_transfer_handler,
     currency_mismatch_handler,
     idempotency_conflict_handler,
+    transaction_not_found_handler,
 )
 
 
@@ -51,6 +53,11 @@ app.add_exception_handler(
 app.add_exception_handler(
     IdempotencyConflictError,
     idempotency_conflict_handler,
+)
+
+app.add_exception_handler(
+    TransactionNotFoundError,
+    transaction_not_found_handler,
 )
 
 app.include_router(

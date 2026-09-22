@@ -24,3 +24,12 @@ class TransactionResponse(BaseModel):
     transaction_type: str
     status: str
     created_at: datetime
+
+
+
+class TransactionHistoryResponse(BaseModel):
+    items: list[TransactionResponse]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int

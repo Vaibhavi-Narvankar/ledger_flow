@@ -1,5 +1,6 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from math import ceil
 
 from app.core.enums import (
     LedgerEntryType,
@@ -12,6 +13,7 @@ from app.core.exceptions import (
     InsufficientBalanceError,
     SameWalletTransferError,
     WalletNotFoundError,
+    TransactionNotFoundError,
 )
 from app.models.ledger import LedgerEntry
 from app.models.transaction import Transaction
@@ -282,7 +284,6 @@ class TransactionService:
         except IntegrityError as exc:
             await self.db.rollback()
 
-            # Concurrent request with same idempotency key
             if getattr(exc.orig, "sqlstate", None) == "23505":
 
                 existing_transaction = (
@@ -309,4 +310,80 @@ class TransactionService:
 
         return TransactionResponse.model_validate(
             transaction
+        )
+
+    async def get_transaction(
+        self,
+        transaction_id: int,
+    ) -> TransactionResponse:
+
+        transaction = await self.transaction_repository.get_by_id(
+            transaction_id
+        )
+
+        if transaction is None:
+            raise TransactionNotFoundError(
+                f"Transaction {transaction_id} not found"
+            )
+
+        return TransactionResponse.model_validate(transaction)
+
+    async def get_wallet_transactions(
+        self,
+        wallet_id: int,
+        transaction_type: str | None = None,
+        status: str | None = None,
+        currency: str | None = None,
+        start_date=None,
+        end_date=None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> TransactionHistoryResponse:
+
+        wallet = await self.wallet_repository.get_by_id(wallet_id)
+
+        if wallet is None:
+            raise WalletNotFoundError(
+                f"Wallet {wallet_id} not found"
+            )
+
+        if page < 1:
+            page = 1
+
+        if page_size < 1:
+            page_size = 20
+
+        offset = (page - 1) * page_size
+
+        total = await self.transaction_repository.count_wallet_transactions(
+            wallet_id=wallet_id,
+            transaction_type=transaction_type,
+            status=status,
+            currency=currency,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        transactions = await self.transaction_repository.get_wallet_transactions(
+            wallet_id=wallet_id,
+            transaction_type=transaction_type,
+            status=status,
+            currency=currency,
+            start_date=start_date,
+            end_date=end_date,
+            offset=offset,
+            limit=page_size,
+        )
+
+        total_pages = ceil(total / page_size) if total > 0 else 0
+
+        return TransactionHistoryResponse(
+            items=[
+                TransactionResponse.model_validate(transaction)
+                for transaction in transactions
+            ],
+            page=page,
+            page_size=page_size,
+            total=total,
+            total_pages=total_pages,
         )

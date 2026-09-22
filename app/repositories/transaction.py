@@ -40,3 +40,92 @@ class TransactionRepository:
         await self.db.refresh(transaction)
 
         return transaction
+
+    async def get_wallet_transactions(
+            self,
+            wallet_id: int,
+            transaction_type: str | None = None,
+            status: str | None = None,
+            currency: str | None = None,
+            start_date=None,
+            end_date=None,
+            offset: int = 0,
+            limit: int = 20,
+        ) -> list[Transaction]:
+            query = select(Transaction).where(
+                or_(
+                    Transaction.sender_wallet_id == wallet_id,
+                    Transaction.receiver_wallet_id == wallet_id,
+                )
+            )
+            if transaction_type is not None:
+                query = query.where(
+                    Transaction.transaction_type == transaction_type
+                )
+            if status is not None:
+                query = query.where(
+                    Transaction.status == status
+                )
+            if currency is not None:
+                query = query.where(
+                    Transaction.currency == currency
+                )
+            if start_date is not None:
+                query = query.where(
+                    Transaction.created_at >= start_date
+                )
+
+            if end_date is not None:
+                query = query.where(
+                    Transaction.created_at <= end_date
+                )
+            query = (
+                query
+                .order_by(
+                    Transaction.created_at.desc(),
+                    Transaction.id.desc(),
+                )
+                .offset(offset)
+                .limit(limit)
+            )
+            result = await self.db.execute(query)
+            return list(result.scalars().all())
+    async def count_wallet_transactions(
+            self,
+            wallet_id: int,
+            transaction_type: str | None = None,
+            status: str | None = None,
+            currency: str | None = None,
+            start_date=None,
+            end_date=None,
+        ) -> int:
+            query = select(
+                func.count(Transaction.id)
+            ).where(
+                or_(
+                    Transaction.sender_wallet_id == wallet_id,
+                    Transaction.receiver_wallet_id == wallet_id,
+                )
+            )
+            if transaction_type is not None:
+                query = query.where(
+                    Transaction.transaction_type == transaction_type
+                )
+            if status is not None:
+                query = query.where(
+                    Transaction.status == status
+                )
+            if currency is not None:
+                query = query.where(
+                    Transaction.currency == currency
+                )
+            if start_date is not None:
+                query = query.where(
+                    Transaction.created_at >= start_date
+                )
+            if end_date is not None:
+                query = query.where(
+                    Transaction.created_at <= end_date
+                )
+            result = await self.db.execute(query)
+            return result.scalar_one()

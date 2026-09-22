@@ -86,3 +86,12 @@ async def idempotency_conflict_handler(
         status_code=409,
         content={"detail": str(exc)},
     )
+
+async def transaction_not_found_handler(
+    request: Request,
+    exc: TransactionNotFoundError,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=404,
+        content={"detail": str(exc)},
+    )

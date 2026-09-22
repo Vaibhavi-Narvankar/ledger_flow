@@ -33,3 +33,6 @@ class CurrencyMismatchError(AppException):
 
 class IdempotencyConflictError(AppException):
     """Raised when an idempotency key is reused for a different request."""
+
+class TransactionNotFoundError(AppException):
+    """Raised when a transaction does not exist."""
