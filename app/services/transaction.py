@@ -23,6 +23,7 @@ from app.repositories.wallet import WalletRepository
 from app.schemas.transaction import (
     DepositCreate,
     TransactionResponse,
+    TransactionHistoryResponse,
     TransferCreate,
 )
 
