@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-
+from sqlalchemy import CheckConstraint
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,8 +35,19 @@ class LedgerEntry(Base):
     )
 
     amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=20, scale=8),
+        Numeric(20, 8),
         nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "entry_type IN ('DEBIT', 'CREDIT')",
+            name="ledger_entry_type_check",
+        ),
+        CheckConstraint(
+            "amount > 0",
+            name="ledger_entry_amount_positive",
+        ),
     )
 
     created_at: Mapped[datetime] = mapped_column(

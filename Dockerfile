@@ -6,9 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt .
+ARG INSTALL_DEV=false
 
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt .
+COPY requirements-dev.txt .
+
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+        pip install --no-cache-dir -r requirements-dev.txt; \
+    else \
+        pip install --no-cache-dir -r requirements.txt; \
+    fi
 
 COPY app ./app
 COPY alembic.ini .
