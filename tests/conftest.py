@@ -20,17 +20,18 @@ from app.core.database import get_db
 
 def migrate_test_database() -> None:
     settings = get_settings()
-
-    test_database_url = (
-        settings.test_database_url
-        .render_as_string(hide_password=False)
+    test_database_url = settings.test_database_url.render_as_string(
+        hide_password=False
     )
 
     os.environ["ALEMBIC_DATABASE_URL"] = test_database_url
 
     try:
         alembic_config = Config("alembic.ini")
+
+        command.downgrade(alembic_config, "base")
         command.upgrade(alembic_config, "head")
+
     finally:
         os.environ.pop("ALEMBIC_DATABASE_URL", None)
 
