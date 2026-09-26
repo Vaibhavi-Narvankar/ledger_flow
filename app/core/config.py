@@ -13,8 +13,11 @@ class Settings(BaseSettings):
     postgres_password: str
     postgres_host: str = "postgres"
     postgres_port: int = 5432
-
     test_postgres_db: str
+
+    redis_host: str = "redis"
+    redis_port: int = 6379
+    redis_db: int = 0
 
     model_config = SettingsConfigDict(
         env_file=".env",
