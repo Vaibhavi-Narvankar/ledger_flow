@@ -36,3 +36,6 @@ class IdempotencyConflictError(AppException):
 
 class TransactionNotFoundError(AppException):
     """Raised when a transaction does not exist."""
+
+class InvalidTransactionStatusTransitionError(AppException):
+    pass

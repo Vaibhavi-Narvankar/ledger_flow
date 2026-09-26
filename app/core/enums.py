@@ -16,3 +16,15 @@ class TransactionStatus(StrEnum):
 class LedgerEntryType(StrEnum):
     DEBIT = "DEBIT"
     CREDIT = "CREDIT"
+
+TRANSACTION_STATUS_TRANSITIONS: dict[
+    TransactionStatus,
+    set[TransactionStatus],
+] = {
+    TransactionStatus.PENDING: {
+        TransactionStatus.COMPLETED,
+        TransactionStatus.FAILED,
+    },
+    TransactionStatus.COMPLETED: set(),
+    TransactionStatus.FAILED: set(),
+}
