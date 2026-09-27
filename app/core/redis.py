@@ -14,4 +14,3 @@ def create_redis_client() -> Redis:
     )
 
 
-redis_client = create_redis_client()

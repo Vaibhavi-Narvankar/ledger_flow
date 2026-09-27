@@ -26,14 +26,24 @@ from app.schemas.transaction import (
     TransactionHistoryResponse,
     TransferCreate,
 )
+from app.services.redis import RedisService
+from app.services.redis_idempotency import RedisIdempotencyService
 
 
 class TransactionService:
-    def __init__(self, db: AsyncSession) -> None:
+
+    def __init__(
+        self,
+        db: AsyncSession,
+        redis_service: RedisService,
+    ) -> None:
         self.db = db
         self.wallet_repository = WalletRepository(db)
         self.transaction_repository = TransactionRepository(db)
         self.ledger_repository = LedgerRepository(db)
+        self.redis_idempotency_service = RedisIdempotencyService(
+            redis_service
+        )
 
     def _validate_deposit_idempotency(
         self,
@@ -90,6 +100,15 @@ class TransactionService:
                 existing_transaction
             )
 
+        redis_acquired = await self.redis_idempotency_service.acquire(
+            idempotency_key
+        )
+
+        if not redis_acquired:
+            raise IdempotencyConflictError(
+                "A request with this idempotency key is already being processed"
+            )
+
 
         wallet = await self.wallet_repository.get_by_id_for_update(
             data.wallet_id
@@ -130,6 +149,11 @@ class TransactionService:
             )
 
             await self.db.commit()
+
+            try:
+                await self.redis_idempotency_service.release(idempotency_key)
+            except Exception:
+                pass
 
         except IntegrityError as exc:
             await self.db.rollback()

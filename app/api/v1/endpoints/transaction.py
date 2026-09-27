@@ -11,7 +11,8 @@ from app.schemas.transaction import (
     TransferCreate,
 )
 from app.services.transaction import TransactionService
-
+from app.core.dependencies import get_redis_service
+from app.services.redis import RedisService
 
 router = APIRouter(
     prefix="/transactions",
@@ -26,17 +27,14 @@ router = APIRouter(
 )
 async def create_deposit(
     data: DepositCreate,
-    idempotency_key: Annotated[
-        str,
-        Header(
-            alias="Idempotency-Key",
-            min_length=1,
-            max_length=64,
-        ),
-    ],
+    idempotency_key: str = Header(...),
     db: AsyncSession = Depends(get_db),
-) -> TransactionResponse:
-    service = TransactionService(db)
+    redis_service: RedisService = Depends(get_redis_service),
+):
+    service = TransactionService(
+        db=db,
+        redis_service=redis_service,
+    )
 
     return await service.create_deposit(
         data=data,

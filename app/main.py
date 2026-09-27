@@ -26,6 +26,14 @@ from app.core.exception_handlers import (
     idempotency_conflict_handler,
     transaction_not_found_handler,
 )
+from contextlib import asynccontextmanager
+from app.core.redis import create_redis_client
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.redis = create_redis_client()
+    yield
+    await app.state.redis.aclose()
 
 
 settings = get_settings()
