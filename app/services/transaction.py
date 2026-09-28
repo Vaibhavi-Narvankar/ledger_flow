@@ -306,6 +306,11 @@ class TransactionService:
 
             await self.db.commit()
 
+            try:
+                await self.redis_idempotency_service.release(idempotency_key)
+            except Exception:
+                pass
+
         except IntegrityError as exc:
             await self.db.rollback()
 
@@ -325,6 +330,15 @@ class TransactionService:
 
                     return TransactionResponse.model_validate(
                         existing_transaction
+                    )
+
+                redis_acquired = await self.redis_idempotency_service.acquire(
+                    idempotency_key
+                )
+
+                if not redis_acquired:
+                    raise IdempotencyConflictError(
+                        "A request with this idempotency key is already being processed"
                     )
 
             raise
