@@ -32,8 +32,10 @@ from app.core.redis import create_redis_client
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.redis = create_redis_client()
-    yield
-    await app.state.redis.aclose()
+    try:
+        yield
+    finally:
+        await app.state.redis.aclose()
 
 
 settings = get_settings()
@@ -41,6 +43,7 @@ settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
+    lifespan=lifespan,
     version="1.0.0",
     debug=settings.debug,
 )

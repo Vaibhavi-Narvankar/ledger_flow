@@ -1,6 +1,5 @@
 import os
 from collections.abc import AsyncGenerator
-
 import pytest
 import pytest_asyncio
 from alembic import command
@@ -16,6 +15,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from asgi_lifespan import LifespanManager
 
 
 def migrate_test_database() -> None:
@@ -83,10 +83,11 @@ async def client(
     app.dependency_overrides[get_db] = override_get_db
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-        ) as async_client:
-            yield async_client
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+            ) as async_client:
+                yield async_client
     finally:
         app.dependency_overrides.clear()

@@ -58,8 +58,12 @@ async def create_transfer(
         ),
     ],
     db: AsyncSession = Depends(get_db),
+    redis_service: RedisService = Depends(get_redis_service),
 ) -> TransactionResponse:
-    service = TransactionService(db)
+    service = TransactionService(
+        db=db,
+        redis_service=redis_service,
+    )
 
     return await service.create_transfer(
         data=data,
@@ -93,10 +97,13 @@ async def get_wallet_transactions(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     db: AsyncSession = Depends(get_db),
+    redis_service: RedisService = Depends(get_redis_service),
 ) -> TransactionHistoryResponse:
 
-    service = TransactionService(db)
-
+    service = TransactionService(
+        db=db,
+        redis_service=redis_service,
+    )
     return await service.get_wallet_transactions(
         wallet_id=wallet_id,
         transaction_type=(
@@ -128,10 +135,13 @@ async def get_wallet_transactions(
 async def get_transaction(
     transaction_id: int,
     db: AsyncSession = Depends(get_db),
+    redis_service: RedisService = Depends(get_redis_service),
 ) -> TransactionResponse:
 
-    service = TransactionService(db)
-
+    service = TransactionService(
+        db=db,
+        redis_service=redis_service,
+    )
     return await service.get_transaction(
         transaction_id=transaction_id,
     )
