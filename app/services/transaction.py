@@ -203,66 +203,74 @@ class TransactionService:
         )
 
         if existing_transaction is not None:
-            self._validate_transfer_idempotency(
-                existing_transaction,
-                data,
-            )
+                    self._validate_transfer_idempotency(
+                        existing_transaction,
+                        data,
+                    )
 
-            return TransactionResponse.model_validate(
-                existing_transaction
-            )
+                    return TransactionResponse.model_validate(
+                        existing_transaction
+                    )
 
         if data.sender_wallet_id == data.receiver_wallet_id:
-            raise SameWalletTransferError(
-                "Sender and receiver wallets must be different"
-            )
+                    raise SameWalletTransferError(
+                        "Sender and receiver wallets must be different"
+                    )
 
         first_wallet_id = min(
-            data.sender_wallet_id,
-            data.receiver_wallet_id,
-        )
+                    data.sender_wallet_id,
+                    data.receiver_wallet_id,
+                )
 
         second_wallet_id = max(
-            data.sender_wallet_id,
-            data.receiver_wallet_id,
-        )
+                    data.sender_wallet_id,
+                    data.receiver_wallet_id,
+                )
 
         first_wallet = await self.wallet_repository.get_by_id_for_update(
-            first_wallet_id
-        )
+                    first_wallet_id
+                )
 
         if first_wallet is None:
-            raise WalletNotFoundError(
-                f"Wallet {first_wallet_id} not found"
-            )
+                    raise WalletNotFoundError(
+                        f"Wallet {first_wallet_id} not found"
+                    )
 
         second_wallet = await self.wallet_repository.get_by_id_for_update(
-            second_wallet_id
-        )
+                    second_wallet_id
+                )
 
         if second_wallet is None:
-            raise WalletNotFoundError(
-                f"Wallet {second_wallet_id} not found"
-            )
-
+                    raise WalletNotFoundError(
+                        f"Wallet {second_wallet_id} not found"
+                    )
 
         if data.sender_wallet_id == first_wallet.id:
-            sender_wallet = first_wallet
-            receiver_wallet = second_wallet
+                    sender_wallet = first_wallet
+                    receiver_wallet = second_wallet
         else:
-            sender_wallet = second_wallet
-            receiver_wallet = first_wallet
+                    sender_wallet = second_wallet
+                    receiver_wallet = first_wallet
 
         if sender_wallet.currency != receiver_wallet.currency:
-            raise CurrencyMismatchError(
-                "Sender and receiver wallets must use the same currency"
-            )
-
+                    raise CurrencyMismatchError(
+                        "Sender and receiver wallets must use the same currency"
+                    )
 
         if sender_wallet.balance < data.amount:
-            raise InsufficientBalanceError(
-                "Insufficient wallet balance"
-            )
+                    raise InsufficientBalanceError(
+                        "Insufficient wallet balance"
+                    )
+
+        redis_acquired = await self.redis_idempotency_service.acquire(
+                    idempotency_key
+                )
+
+        if not redis_acquired:
+                    raise IdempotencyConflictError(
+                        "A request with this idempotency key is already being processed"
+                    )
+
 
         try:
             transaction = Transaction(
@@ -332,14 +340,6 @@ class TransactionService:
                         existing_transaction
                     )
 
-                redis_acquired = await self.redis_idempotency_service.acquire(
-                    idempotency_key
-                )
-
-                if not redis_acquired:
-                    raise IdempotencyConflictError(
-                        "A request with this idempotency key is already being processed"
-                    )
 
             raise
 
