@@ -1,6 +1,8 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from app.core.exceptions import UserAlreadyExistsError,InsufficientBalanceError,SameWalletTransferError,CurrencyMismatchError
+from app.core.exceptions import (UserAlreadyExistsError,InsufficientBalanceError,SameWalletTransferError,CurrencyMismatchError,
+IdempotencyConflictError,WalletAlreadyExistsError,UserNotFoundError,WalletAlreadyExistsError,WalletNotFoundError,UnsupportedCurrencyError,
+TransactionNotFoundError,RedisUnavailableError)
 
 
 async def user_already_exists_handler(
@@ -94,4 +96,15 @@ async def transaction_not_found_handler(
     return JSONResponse(
         status_code=404,
         content={"detail": str(exc)},
+    )
+
+async def redis_unavailable_handler(
+    request: Request,
+    exc: RedisUnavailableError,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": str(exc),
+        },
     )

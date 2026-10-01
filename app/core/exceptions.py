@@ -39,3 +39,6 @@ class TransactionNotFoundError(AppException):
 
 class InvalidTransactionStatusTransitionError(AppException):
     pass
+
+class RedisUnavailableError(AppException):
+    """Raised when Redis is unavailable."""

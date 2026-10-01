@@ -13,6 +13,7 @@ from app.core.exceptions import (
     CurrencyMismatchError,
     IdempotencyConflictError,
     TransactionNotFoundError,
+    RedisUnavailableError,
 )
 from app.core.exception_handlers import (
     user_already_exists_handler,
@@ -25,6 +26,7 @@ from app.core.exception_handlers import (
     currency_mismatch_handler,
     idempotency_conflict_handler,
     transaction_not_found_handler,
+    redis_unavailable_handler,
 )
 from contextlib import asynccontextmanager
 from app.core.redis import create_redis_client
@@ -97,6 +99,11 @@ app.add_exception_handler(
 app.add_exception_handler(
     UnsupportedCurrencyError,
     unsupported_currency_handler,
+)
+
+app.add_exception_handler(
+    RedisUnavailableError,
+    redis_unavailable_handler,
 )
 
 app.include_router(
