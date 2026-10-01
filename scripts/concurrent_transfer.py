@@ -9,7 +9,7 @@ URL = "http://localhost:8000/api/v1/transactions/transfers"
 SENDER_WALLET_ID = 4
 RECEIVER_WALLET_ID = 5
 
-CONCURRENCY_LEVELS = [10, 50, 100]
+CONCURRENCY_LEVELS = [200]
 
 
 async def send_transfer(
