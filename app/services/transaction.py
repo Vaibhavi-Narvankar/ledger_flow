@@ -28,6 +28,7 @@ from app.schemas.transaction import (
 )
 from app.services.redis import RedisService
 from app.services.redis_idempotency import RedisIdempotencyService
+import time
 
 
 class TransactionService:
@@ -194,6 +195,8 @@ class TransactionService:
         idempotency_key: str,
     ) -> TransactionResponse:
 
+        total_start = time.perf_counter()
+
         idempotency_key = idempotency_key.strip()
 
         existing_transaction = (
@@ -212,6 +215,27 @@ class TransactionService:
                 existing_transaction
             )
 
+        # -----------------------------
+        # Redis acquire
+        # -----------------------------
+
+        redis_start = time.perf_counter()
+
+        redis_acquired = await self.redis_idempotency_service.acquire(
+            idempotency_key
+        )
+
+        redis_time = time.perf_counter() - redis_start
+
+        if not redis_acquired:
+            raise IdempotencyConflictError(
+                "A request with this idempotency key is already being processed"
+            )
+
+        # -----------------------------
+        # Validation
+        # -----------------------------
+
         if data.sender_wallet_id == data.receiver_wallet_id:
             raise SameWalletTransferError(
                 "Sender and receiver wallets must be different"
@@ -226,6 +250,12 @@ class TransactionService:
             data.sender_wallet_id,
             data.receiver_wallet_id,
         )
+
+        # -----------------------------
+        # Wallet locks
+        # -----------------------------
+
+        wallet_lock_start = time.perf_counter()
 
         first_wallet = await self.wallet_repository.get_by_id_for_update(
             first_wallet_id
@@ -245,6 +275,12 @@ class TransactionService:
                 f"Wallet {second_wallet_id} not found"
             )
 
+        wallet_lock_time = time.perf_counter() - wallet_lock_start
+
+        # -----------------------------
+        # Determine sender/receiver
+        # -----------------------------
+
         if data.sender_wallet_id == first_wallet.id:
             sender_wallet = first_wallet
             receiver_wallet = second_wallet
@@ -262,14 +298,11 @@ class TransactionService:
                 "Insufficient wallet balance"
             )
 
-        redis_acquired = await self.redis_idempotency_service.acquire(
-            idempotency_key
-        )
+        # -----------------------------
+        # Database writes
+        # -----------------------------
 
-        if not redis_acquired:
-            raise IdempotencyConflictError(
-                "A request with this idempotency key is already being processed"
-            )
+        db_write_start = time.perf_counter()
 
         try:
             transaction = Transaction(
@@ -303,15 +336,38 @@ class TransactionService:
                 amount=data.amount,
             )
 
-            await self.ledger_repository.create(debit_entry)
-            await self.ledger_repository.create(credit_entry)
+            await self.ledger_repository.create(
+                debit_entry
+            )
+
+            await self.ledger_repository.create(
+                credit_entry
+            )
+
+            db_write_time = time.perf_counter() - db_write_start
+
+            # -----------------------------
+            # Commit
+            # -----------------------------
+
+            commit_start = time.perf_counter()
 
             await self.db.commit()
+
+            commit_time = time.perf_counter() - commit_start
+
+            try:
+                await self.redis_idempotency_service.release(
+                    idempotency_key
+                )
+            except Exception:
+                pass
 
         except IntegrityError as exc:
             await self.db.rollback()
 
             if getattr(exc.orig, "sqlstate", None) == "23505":
+
                 existing_transaction = (
                     await self.transaction_repository.get_by_idempotency_key(
                         idempotency_key
@@ -334,13 +390,17 @@ class TransactionService:
             await self.db.rollback()
             raise
 
-        finally:
-            try:
-                await self.redis_idempotency_service.release(
-                    idempotency_key
-                )
-            except Exception:
-                pass
+        total_time = time.perf_counter() - total_start
+
+        print(
+            "\n"
+            "TRANSFER TIMING\n"
+            f"Redis acquire : {redis_time * 1000:.2f} ms\n"
+            f"Wallet locks  : {wallet_lock_time * 1000:.2f} ms\n"
+            f"DB writes     : {db_write_time * 1000:.2f} ms\n"
+            f"Commit        : {commit_time * 1000:.2f} ms\n"
+            f"Total         : {total_time * 1000:.2f} ms\n"
+        )
 
         return TransactionResponse.model_validate(
             transaction

@@ -14,8 +14,10 @@ def create_engine() -> AsyncEngine:
 
     return create_async_engine(
         settings.database_url,
-        echo=settings.debug,
+        echo=False,
         pool_pre_ping=True,
+        pool_size=20,
+        max_overflow=0,
     )
 
 engine = create_engine()
