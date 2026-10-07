@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
         await app.state.redis.aclose()
 
 
+
 settings = get_settings()
 
 
