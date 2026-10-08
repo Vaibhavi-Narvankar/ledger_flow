@@ -392,16 +392,6 @@ class TransactionService:
 
         total_time = time.perf_counter() - total_start
 
-        print(
-            "\n"
-            "TRANSFER TIMING\n"
-            f"Redis acquire : {redis_time * 1000:.2f} ms\n"
-            f"Wallet locks  : {wallet_lock_time * 1000:.2f} ms\n"
-            f"DB writes     : {db_write_time * 1000:.2f} ms\n"
-            f"Commit        : {commit_time * 1000:.2f} ms\n"
-            f"Total         : {total_time * 1000:.2f} ms\n"
-        )
-
         return TransactionResponse.model_validate(
             transaction
         )

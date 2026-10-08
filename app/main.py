@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-
+from app.middleware.database import database_failure_middleware
 from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import (
@@ -27,6 +27,8 @@ from app.core.exception_handlers import (
     idempotency_conflict_handler,
     transaction_not_found_handler,
     redis_unavailable_handler,
+
+
 )
 from contextlib import asynccontextmanager
 from app.core.redis import create_redis_client
@@ -50,7 +52,7 @@ app = FastAPI(
     version="1.0.0",
     debug=settings.debug,
 )
-
+app.middleware("http")(database_failure_middleware)
 
 app.add_exception_handler(
     UserAlreadyExistsError,
@@ -106,6 +108,7 @@ app.add_exception_handler(
     RedisUnavailableError,
     redis_unavailable_handler,
 )
+
 
 app.include_router(
     api_router,
