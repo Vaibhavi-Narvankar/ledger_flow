@@ -1,5 +1,6 @@
 from decimal import Decimal
-
+from sqlalchemy import select
+from app.models.outbox_event import OutboxEvent
 import pytest
 from httpx import AsyncClient
 
@@ -539,3 +540,128 @@ async def test_transfer_idempotency_conflict(
     )
 
     assert second.status_code == 409
+
+@pytest.mark.asyncio
+async def test_deposit_creates_outbox_event(
+    client: AsyncClient,
+    db_session,
+) -> None:
+    user_id = await create_user(
+        client,
+        "outbox-deposit@test.com",
+    )
+
+    wallet_id = await create_wallet(
+        client,
+        user_id,
+    )
+
+    response = await deposit(
+        client,
+        wallet_id,
+        "100",
+        "outbox-deposit-001",
+    )
+
+    assert response.status_code == 201
+
+    transaction_id = response.json()["id"]
+
+    result = await db_session.execute(
+        select(OutboxEvent).where(
+            OutboxEvent.aggregate_id == transaction_id,
+            OutboxEvent.event_type == "DepositCompleted",
+        )
+    )
+
+    event = result.scalar_one()
+
+    assert event.status == "PENDING"
+    assert event.payload["transaction_id"] == transaction_id
+    assert event.payload["wallet_id"] == wallet_id
+    assert event.payload["amount"] == "100.00000000"
+    assert event.payload["currency"] == "INR"
+
+@pytest.mark.asyncio
+async def test_transfer_creates_outbox_event(
+    client: AsyncClient,
+    db_session,
+) -> None:
+    sender_user = await create_user(
+        client,
+        "outbox-transfer-sender@test.com",
+    )
+
+    receiver_user = await create_user(
+        client,
+        "outbox-transfer-receiver@test.com",
+    )
+
+    sender_wallet = await create_wallet(
+        client,
+        sender_user,
+    )
+
+    receiver_wallet = await create_wallet(
+        client,
+        receiver_user,
+    )
+
+    await deposit(
+        client,
+        sender_wallet,
+        "500",
+        "outbox-transfer-funding-001",
+    )
+
+    response = await transfer(
+        client,
+        sender_wallet,
+        receiver_wallet,
+        "100",
+        "outbox-transfer-001",
+    )
+
+    assert response.status_code == 201
+
+    transaction_id = response.json()["id"]
+
+    result = await db_session.execute(
+        select(OutboxEvent).where(
+            OutboxEvent.aggregate_id == transaction_id,
+            OutboxEvent.event_type == "TransferCompleted",
+        )
+    )
+
+    event = result.scalar_one()
+
+    assert event.status == "PENDING"
+    assert event.payload["transaction_id"] == transaction_id
+    assert event.payload["sender_wallet_id"] == sender_wallet
+    assert event.payload["receiver_wallet_id"] == receiver_wallet
+    assert event.payload["amount"] == "100.00000000"
+    assert event.payload["currency"] == "INR"
+
+
+@pytest.mark.asyncio
+async def test_failed_deposit_does_not_create_outbox_event(
+    client: AsyncClient,
+    db_session,
+) -> None:
+    response = await deposit(
+        client,
+        wallet_id=999999,
+        amount="100",
+        key="outbox-failed-deposit-001",
+    )
+
+    assert response.status_code == 404
+
+    result = await db_session.execute(
+        select(OutboxEvent).where(
+            OutboxEvent.event_type == "DepositCompleted",
+            OutboxEvent.payload["wallet_id"].as_integer() == 999999,
+        )
+    )
+
+    assert result.scalar_one_or_none() is None

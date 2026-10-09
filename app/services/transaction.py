@@ -1,7 +1,7 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from math import ceil
-
+from app.repositories.outbox import OutboxRepository
 from app.core.enums import (
     LedgerEntryType,
     TransactionStatus,
@@ -42,6 +42,7 @@ class TransactionService:
         self.wallet_repository = WalletRepository(db)
         self.transaction_repository = TransactionRepository(db)
         self.ledger_repository = LedgerRepository(db)
+        self.outbox_repository = OutboxRepository(db)
         self.redis_idempotency_service = RedisIdempotencyService(
             redis_service
         )
@@ -147,6 +148,19 @@ class TransactionService:
 
             await self.ledger_repository.create(
                 ledger_entry
+            )
+
+            await self.outbox_repository.create(
+                event_type="DepositCompleted",
+                aggregate_type="transaction",
+                aggregate_id=transaction.id,
+                payload={
+                    "event_type": "DepositCompleted",
+                    "transaction_id": transaction.id,
+                    "wallet_id": wallet.id,
+                    "amount": str(transaction.amount),
+                    "currency": transaction.currency,
+                },
             )
 
             await self.db.commit()
@@ -344,18 +358,23 @@ class TransactionService:
                 credit_entry
             )
 
+            await self.outbox_repository.create(
+                event_type="TransferCompleted",
+                aggregate_type="transaction",
+                aggregate_id=transaction.id,
+                payload={
+                    "event_type": "TransferCompleted",
+                    "transaction_id": transaction.id,
+                    "sender_wallet_id": sender_wallet.id,
+                    "receiver_wallet_id": receiver_wallet.id,
+                    "amount": str(transaction.amount),
+                    "currency": transaction.currency,
+                },
+            )
             db_write_time = time.perf_counter() - db_write_start
-
-            # -----------------------------
-            # Commit
-            # -----------------------------
-
             commit_start = time.perf_counter()
-
             await self.db.commit()
-
             commit_time = time.perf_counter() - commit_start
-
             try:
                 await self.redis_idempotency_service.release(
                     idempotency_key

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.middleware.database import database_failure_middleware
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.rabbitmq import RabbitMQService
 from app.core.exceptions import (
     UserAlreadyExistsError,
     UserNotFoundError,
@@ -36,9 +37,14 @@ from app.core.redis import create_redis_client
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.redis = create_redis_client()
+    app.state.rabbitmq = RabbitMQService()
+
     try:
+        await app.state.rabbitmq.connect()
+        await app.state.rabbitmq.declare_topology()
         yield
     finally:
+        await app.state.rabbitmq.close()
         await app.state.redis.aclose()
 
 
