@@ -14,6 +14,7 @@ from app.models import (
     Transaction,
     LedgerEntry,
     OutboxEvent,
+    ProcessedEvent,
 )
 
 
